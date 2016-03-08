@@ -7,10 +7,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	//"github.com/googollee/go-socket.io"
 	"github.com/jmcvetta/neoism"
 	zmq "github.com/pebbe/zmq4"
-	//"net/http"
 )
 
 var (
@@ -18,6 +16,9 @@ var (
 	dbPassword = "wiirok"
 	dbUrl      = "http://" + dbUsername + ":" + dbPassword + "@localhost:7474/db/data"
 )
+
+// an empty interface that fits any types it's given
+type AnyType interface{}
 
 // Query data struct for decoding json format request data
 type ReqZMQ struct {
@@ -37,6 +38,16 @@ type Person struct {
 	Born int    `json:"born"`
 }
 
+type QueryRequest struct {
+	Name  string
+	Query *neoism.CypherQuery
+}
+
+type QueryResult struct {
+	Name   string
+	Result AnyType
+}
+
 func movieCastCQ(title string, persons *[]Person) *neoism.CypherQuery {
 	return &neoism.CypherQuery{
 		Statement: `
@@ -47,6 +58,11 @@ func movieCastCQ(title string, persons *[]Person) *neoism.CypherQuery {
 		Parameters: neoism.Props{"title": title},
 		Result:     persons,
 	}
+}
+
+func runConcurrentCQs(db *neoism.Database, queries []QueryRequest, cb func([]QueryResult) (interface{}, error)) (interface{}, error) {
+	// TODO: implement this function
+	return nil, nil
 }
 
 func main() {
@@ -81,7 +97,8 @@ func main() {
 		resJson, err := json.Marshal(res)
 		if err != nil {
 			fmt.Println(err.Error())
+			socket.Send(err.Error(), 0)
 		}
-		socket.Send(string(resJson), 0)
+		socket.SendBytes(resJson, 0)
 	}
 }
