@@ -39,13 +39,15 @@ type Person struct {
 }
 
 type QueryRequest struct {
-	Name  string
-	Query *neoism.CypherQuery
+	Name   string
+	Query  *neoism.CypherQuery
+	Result AnyType
 }
 
 type QueryResult struct {
-	Name   string
-	Result AnyType
+	Name    string
+	Columns []string
+	Result  AnyType
 }
 
 func movieCastCQ(title string, persons *[]Person) *neoism.CypherQuery {
@@ -60,9 +62,24 @@ func movieCastCQ(title string, persons *[]Person) *neoism.CypherQuery {
 	}
 }
 
+func doSingleQuery(db *neoism.Database, query *QueryRequest, result *QueryResult) {
+	query.Query.Result = &(query.Result)
+	err := db.Cypher(query.Query)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+	result.Name = query.Name
+	result.Columns = query.Query.Columns()
+	result.Result = query.Result
+}
+
 func runConcurrentCQs(db *neoism.Database, queries []QueryRequest, cb func([]QueryResult) (interface{}, error)) (interface{}, error) {
 	// TODO: implement this function
-	return nil, nil
+	results := make([]QueryResult, len(queries))
+	for i, query := range queries {
+		go doSingleQuery(db, &query, &results[i])
+	}
+	return cb(results)
 }
 
 func main() {
