@@ -6,15 +6,21 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/jmcvetta/neoism"
 	"net/http"
+	"regexp"
 )
 
 var (
+	// database envs
 	dbUsername = "neo4j"
 	dbPassword = "wiirok"
 	dbUrl      = "http://" + dbUsername + ":" + dbPassword + "@localhost:7474/db/data"
+
+	// regexp
+	urlQuery = regexp.MustCompile("^/(query)/([a-zA-Z0-9]+)$")
 
 	/*
 	 * Cypher Queries
@@ -118,18 +124,27 @@ func mergeHandler(results []QueryResult) (interface{}, error) {
 }
 
 // Http handler for `/query` route.
-func httpQueryHandler(w http.ResponseWriter, req *http.Request) {
+func httpQueryHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Request from " + r.URL.Path)
+
 	db, err := neoism.Connect(dbUrl)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+
+	queryType, err := getUrlQueryType(w, r)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	fmt.Println("Query type: " + queryType)
 
 	queryReqRecommendFriend := QueryRequest{
 		Name:   "recommend-friend-with-limit",
 		Result: &[]Person{},
 		Query: makeCypherQuery(
 			RECOMMENDED_FIRENDS_WITH_LIMIT,
-			neoism.Props{"name": "Tou Hanks", "limit": 5},
+			neoism.Props{"name": "Tom Hanks", "limit": 5},
 			nil,
 		),
 	}
@@ -149,8 +164,17 @@ func httpQueryHandler(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(results)
 }
 
+func getUrlQueryType(w http.ResponseWriter, r *http.Request) (string, error) {
+	q := urlQuery.FindStringSubmatch(r.URL.Path)
+	if q == nil {
+		http.NotFound(w, r)
+		return "", errors.New("Invalid query type")
+	}
+	return q[2], nil
+}
+
 func main() {
 
-	http.HandleFunc("/query", httpQueryHandler)
+	http.HandleFunc("/query/", httpQueryHandler)
 	http.ListenAndServe(":8888", nil)
 }
