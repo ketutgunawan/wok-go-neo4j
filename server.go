@@ -44,12 +44,43 @@ var (
 		WHERE movie.title={title}
 		RETURN a.name AS name, a.born AS born
 	`
+	ALL_USER = `
+		MATCH (u:USER)
+		RETURN u.name as name, u.email as email, u.role as role,
+				u.hashedPassword as hashedPassword, u.salt as salt,
+				u._id as _id
+	`
+	FIND_USER_BY_EMAIL = `
+		MATCH (u:USER)
+		WHERE u.email={email}
+		RETURN u.name as name, u.email as email, u.role as role,
+				u.hashedPassword as hashedPassword, u.salt as salt,
+				u.id as id
+	`
+	FIND_USER_BY_ID = `
+		MATCH (u:USER)
+		WHERE u.id={id}
+		RETURN u.name as name, u.email as email, u.role as role,
+				u.hashedPassword as hashedPassword, u.salt as salt,
+				u.id as id
+	
+	`
 )
 
 // for storing :Person data from db
 type Person struct {
 	Name string `json:"names"`
 	Born int    `json:"born"`
+}
+
+// for storing User
+type User struct {
+	Id             string `json:"id"`
+	Name           string `json:"name"`
+	Email          string `json:"email"`
+	Role           string `json:"role"`
+	HashedPassword string `json:"hashedPassword"`
+	Salt           string `json:"salt"`
 }
 
 // Cypher query request
@@ -76,6 +107,18 @@ func makeCypherQuery(statement string, params neoism.Props, result *interface{})
 		Parameters: params,
 		Result:     result,
 	}
+}
+
+// Run a single query and save the result in result
+func runSingleQuerySync(db *neoism.Database, query QueryRequest, result *QueryResult) {
+	result.Result = query.Result
+	query.Query.Result = result.Result
+	err := db.Cypher(query.Query)
+	if err != nil {
+		fmt.Printf("Err in runSingleQuerySync: %s\n", err.Error())
+	}
+	result.Name = query.Name
+	result.Columns = query.Query.Columns()
 }
 
 // Helper function for runConcurrentQuery function.
@@ -164,6 +207,55 @@ func httpQueryHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(results)
 }
 
+func httpUserHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Request from " + r.URL.Path)
+
+	db, err := neoism.Connect(dbUrl)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	urlQueryMap := r.URL.Query()
+	id, email := "", ""
+	if val, ok := urlQueryMap["id"]; ok {
+		id = val[0]
+	} else {
+		email = urlQueryMap["email"][0]
+	}
+	fmt.Printf("email=%s\n", email)
+	fmt.Printf("id=%s\n", id)
+
+	queryReqFindUserByEmail := QueryRequest{
+		Name:   "find-user-by-email",
+		Result: &[]User{},
+		Query: makeCypherQuery(
+			FIND_USER_BY_EMAIL,
+			neoism.Props{"email": email},
+			nil,
+		),
+	}
+
+	queryReqFindUserById := QueryRequest{
+		Name:   "find-user-by-id",
+		Result: &[]User{},
+		Query: makeCypherQuery(
+			FIND_USER_BY_ID,
+			neoism.Props{"id": id},
+			nil,
+		),
+	}
+
+	qq := queryReqFindUserById
+	if id == "" {
+		qq = queryReqFindUserByEmail
+	}
+	result1 := QueryResult{}
+	//runSingleQuerySync(db, queryReqFindUserByEmail, &result1)
+	runSingleQuerySync(db, qq, &result1)
+	json.NewEncoder(w).Encode(result1.Result)
+
+}
+
 func getUrlQueryType(w http.ResponseWriter, r *http.Request) (string, error) {
 	q := urlQuery.FindStringSubmatch(r.URL.Path)
 	if q == nil {
@@ -175,6 +267,8 @@ func getUrlQueryType(w http.ResponseWriter, r *http.Request) (string, error) {
 
 func main() {
 
+	// TODO: use closure to wrap all the handlers
 	http.HandleFunc("/query/", httpQueryHandler)
+	http.HandleFunc("/users/", httpUserHandler)
 	http.ListenAndServe(":8888", nil)
 }

@@ -2,12 +2,29 @@
 
 An <strong>UNFINISHED</strong> server written in Go and backed with Neo4j
 
-By support of:
-<ul>
-<li>
-<a href="https://github.com/jmcvetta/neoism">neoism</a>
-</li>
-<li>
-<a href="http://zeromq.org/">ZeroMQ</a>
-</li>
-</ul>
+## REST APIs:
+** User
+* GET  /users -- Get all users
+* GET  /users/:id  -- Get a user by id
+* POST /users -- Create a user (with user data)
+* POST /users/query/:queryName -- Custom query (with query parameters)
+* PUT  /users/:id -- Update a user by id (with user data)
+
+** POST
+* GET  /posts -- Get all posts
+* GET  /posts/:id -- Get a post by id
+* POST /posts -- Create a post (with post data)
+* POST /posts/query/:queryName -- Custom query (with query parameters)
+* PUT  /posts/:id -- Update a post by id (with post data)
+
+** Relation
+* GET  /relation/:id1/:id2 -- Get relation(with properties) between nodes by their ids 
+* POST /relation/query/:queryName -- Custom query(with query parameters)
+
+
+
+# By support of:
+
+* Neoism(https://github.com/jmcvetta/neoism)
+* HttpRouter(https://github.com/julienschmidt/httprouter)
+
