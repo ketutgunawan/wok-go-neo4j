@@ -8,9 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jmcvetta/neoism"
+	"io"
+	"log"
 	"net/http"
 	"regexp"
+
+	"github.com/jmcvetta/neoism"
+	"github.com/julienschmidt/httprouter"
 )
 
 var (
@@ -18,7 +22,10 @@ var (
 	dbUsername = "neo4j"
 	dbPassword = "wiirok"
 	dbUrl      = "http://" + dbUsername + ":" + dbPassword + "@localhost:7474/db/data"
+	db         *neoism.Database
+)
 
+var (
 	// regexp
 	urlQuery = regexp.MustCompile("^/(query)/([a-zA-Z0-9]+)$")
 
@@ -67,6 +74,14 @@ var (
 	`
 )
 
+// for req body
+type UserBody struct {
+	Id    string
+	Name  string
+	Email string
+	Role  string
+}
+
 // for storing :Person data from db
 type Person struct {
 	Name string `json:"names"`
@@ -110,15 +125,16 @@ func makeCypherQuery(statement string, params neoism.Props, result *interface{})
 }
 
 // Run a single query and save the result in result
-func runSingleQuerySync(db *neoism.Database, query QueryRequest, result *QueryResult) {
+func runSingleQuerySync(db *neoism.Database, query QueryRequest, result *QueryResult) error {
 	result.Result = query.Result
 	query.Query.Result = result.Result
 	err := db.Cypher(query.Query)
 	if err != nil {
-		fmt.Printf("Err in runSingleQuerySync: %s\n", err.Error())
+		return err
 	}
 	result.Name = query.Name
 	result.Columns = query.Query.Columns()
+	return nil
 }
 
 // Helper function for runConcurrentQuery function.
@@ -170,11 +186,6 @@ func mergeHandler(results []QueryResult) (interface{}, error) {
 func httpQueryHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request from " + r.URL.Path)
 
-	db, err := neoism.Connect(dbUrl)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-
 	queryType, err := getUrlQueryType(w, r)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -209,11 +220,6 @@ func httpQueryHandler(w http.ResponseWriter, r *http.Request) {
 
 func httpUserHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request from " + r.URL.Path)
-
-	db, err := neoism.Connect(dbUrl)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
 
 	urlQueryMap := r.URL.Query()
 	id, email := "", ""
@@ -265,10 +271,74 @@ func getUrlQueryType(w http.ResponseWriter, r *http.Request) (string, error) {
 	return q[2], nil
 }
 
-func main() {
+func UserGetOne(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.Println("Request from " + r.Host + r.URL.Path)
 
-	// TODO: use closure to wrap all the handlers
-	http.HandleFunc("/query/", httpQueryHandler)
-	http.HandleFunc("/users/", httpUserHandler)
-	http.ListenAndServe(":8888", nil)
+	queryReqFindUserById := QueryRequest{
+		Name:   "find-user-by-id",
+		Result: &[]User{},
+		Query: makeCypherQuery(
+			FIND_USER_BY_ID,
+			neoism.Props{"id": ps.ByName("id")},
+			nil,
+		),
+	}
+
+	result := QueryResult{}
+	runSingleQuerySync(db, queryReqFindUserById, &result)
+	json.NewEncoder(w).Encode(result.Result)
+}
+
+func UserQuery(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.Println("Request from " + r.Host + r.URL.Path)
+
+	// TODO: Maybe 200 is too much?
+	b := make([]byte, 100)
+	n, err := r.Body.Read(b)
+	if err != nil && err != io.EOF {
+		json.NewEncoder(w).Encode(err.Error())
+		return
+	}
+	jsonFormatter := regexp.MustCompile(`"([a-zA-Z0-9]+)":`)
+	params := jsonFormatter.ReplaceAllString(string(b[:n]), "${1}:")
+
+	finUser := "MATCH (u:USER " + params + ")" +
+		"RETURN u.name as name, u.email as email, u.role as role," +
+		"u.hashedPassword as hashedPassword, u.salt as salt," +
+		"u.id as id"
+
+	queryReqFindUser := QueryRequest{
+		Name:   "find-user",
+		Result: &[]User{},
+		Query: makeCypherQuery(
+			finUser,
+			nil,
+			nil,
+		),
+	}
+
+	result := QueryResult{}
+	err = runSingleQuerySync(db, queryReqFindUser, &result)
+	if err != nil {
+		json.NewEncoder(w).Encode(err.Error())
+		return
+	}
+	json.NewEncoder(w).Encode(result.Result)
+}
+
+func init() {
+	var err error
+	db, err = neoism.Connect(dbUrl)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	router := httprouter.New()
+	router.GET("/users/:id", UserGetOne)
+	router.POST("/users/query", UserQuery)
+	//	http.HandleFunc("/query/", httpQueryHandler)
+	//	http.HandleFunc("/users/", httpUserHandler)
+	log.Fatal(http.ListenAndServe(":8888", router))
 }

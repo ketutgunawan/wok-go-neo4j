@@ -2,3 +2,6 @@
 *.go~
 *.swp
 *~
+
+# build files
+server
