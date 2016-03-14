@@ -28,7 +28,9 @@ var (
 var (
 	// regexp
 	urlQuery = regexp.MustCompile("^/(query)/([a-zA-Z0-9]+)$")
+)
 
+var (
 	/*
 	 * Cypher Queries
 	 */
@@ -116,7 +118,8 @@ type QueryResult struct {
 }
 
 // make a cypher query
-func makeCypherQuery(statement string, params neoism.Props, result *interface{}) *neoism.CypherQuery {
+func makeCypherQuery(statement string, params neoism.Props,
+	result *interface{}) *neoism.CypherQuery {
 	return &neoism.CypherQuery{
 		Statement:  statement,
 		Parameters: params,
@@ -125,7 +128,8 @@ func makeCypherQuery(statement string, params neoism.Props, result *interface{})
 }
 
 // Run a single query and save the result in result
-func runSingleQuerySync(db *neoism.Database, query QueryRequest, result *QueryResult) error {
+func runSingleQuerySync(db *neoism.Database, query QueryRequest,
+	result *QueryResult) error {
 	result.Result = query.Result
 	query.Query.Result = result.Result
 	err := db.Cypher(query.Query)
@@ -139,7 +143,8 @@ func runSingleQuerySync(db *neoism.Database, query QueryRequest, result *QueryRe
 
 // Helper function for runConcurrentQuery function.
 // Run a single query and send the result to the channel `ch`.
-func runSingleQuery(db *neoism.Database, query QueryRequest, ch chan QueryResult) {
+func runSingleQuery(db *neoism.Database, query QueryRequest,
+	ch chan QueryResult) {
 	result := QueryResult{}
 	result.Result = query.Result
 	query.Query.Result = result.Result
@@ -154,7 +159,8 @@ func runSingleQuery(db *neoism.Database, query QueryRequest, ch chan QueryResult
 
 // Run the queries concurrently and accept a handler function to do some
 // post-processing of the result retrieved from database
-func runConcurrentQuery(db *neoism.Database, queries []QueryRequest, handler func([]QueryResult) (interface{}, error)) (interface{}, error) {
+func runConcurrentQuery(db *neoism.Database, queries []QueryRequest,
+	handler func([]QueryResult) (interface{}, error)) (interface{}, error) {
 	queryLen := len(queries)
 	results := make([]QueryResult, queryLen)
 	ch := make(chan QueryResult, queryLen)
@@ -218,50 +224,6 @@ func httpQueryHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(results)
 }
 
-func httpUserHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Request from " + r.URL.Path)
-
-	urlQueryMap := r.URL.Query()
-	id, email := "", ""
-	if val, ok := urlQueryMap["id"]; ok {
-		id = val[0]
-	} else {
-		email = urlQueryMap["email"][0]
-	}
-	fmt.Printf("email=%s\n", email)
-	fmt.Printf("id=%s\n", id)
-
-	queryReqFindUserByEmail := QueryRequest{
-		Name:   "find-user-by-email",
-		Result: &[]User{},
-		Query: makeCypherQuery(
-			FIND_USER_BY_EMAIL,
-			neoism.Props{"email": email},
-			nil,
-		),
-	}
-
-	queryReqFindUserById := QueryRequest{
-		Name:   "find-user-by-id",
-		Result: &[]User{},
-		Query: makeCypherQuery(
-			FIND_USER_BY_ID,
-			neoism.Props{"id": id},
-			nil,
-		),
-	}
-
-	qq := queryReqFindUserById
-	if id == "" {
-		qq = queryReqFindUserByEmail
-	}
-	result1 := QueryResult{}
-	//runSingleQuerySync(db, queryReqFindUserByEmail, &result1)
-	runSingleQuerySync(db, qq, &result1)
-	json.NewEncoder(w).Encode(result1.Result)
-
-}
-
 func getUrlQueryType(w http.ResponseWriter, r *http.Request) (string, error) {
 	q := urlQuery.FindStringSubmatch(r.URL.Path)
 	if q == nil {
@@ -271,6 +233,32 @@ func getUrlQueryType(w http.ResponseWriter, r *http.Request) (string, error) {
 	return q[2], nil
 }
 
+// handler for GET `/users`
+func UserGetAll(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	queryReqFindAllUser := QueryRequest{
+		Name:   "find-all-user",
+		Result: &[]User{},
+		Query: makeCypherQuery(
+			ALL_USER,
+			nil,
+			nil,
+		),
+	}
+
+	result := QueryResult{}
+	err := runSingleQuerySync(db, queryReqFindAllUser, &result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(result.Result)
+	if err != nil {
+		log.Println("error writing UserGetAll responses", err)
+	}
+}
+
+// handler for GET `/users/:id`
 func UserGetOne(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.Println("Request from " + r.Host + r.URL.Path)
 
@@ -286,9 +274,14 @@ func UserGetOne(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	result := QueryResult{}
 	runSingleQuerySync(db, queryReqFindUserById, &result)
-	json.NewEncoder(w).Encode(result.Result)
+
+	err := json.NewEncoder(w).Encode(result.Result)
+	if err != nil {
+		log.Println("error writing UserGetOne responses", err)
+	}
 }
 
+// handler for POST `/users/query`
 func UserQuery(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.Println("Request from " + r.Host + r.URL.Path)
 
@@ -296,13 +289,11 @@ func UserQuery(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	b := make([]byte, 100)
 	n, err := r.Body.Read(b)
 	if err != nil && err != io.EOF {
-		json.NewEncoder(w).Encode(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	jsonFormatter := regexp.MustCompile(`"([a-zA-Z0-9]+)":`)
-	params := jsonFormatter.ReplaceAllString(string(b[:n]), "${1}:")
 
-	finUser := "MATCH (u:USER " + params + ")" +
+	finUserCQ := "MATCH (u:USER " + formatToNeoJson(string(b[:n])) + ")" +
 		"RETURN u.name as name, u.email as email, u.role as role," +
 		"u.hashedPassword as hashedPassword, u.salt as salt," +
 		"u.id as id"
@@ -311,7 +302,7 @@ func UserQuery(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		Name:   "find-user",
 		Result: &[]User{},
 		Query: makeCypherQuery(
-			finUser,
+			finUserCQ,
 			nil,
 			nil,
 		),
@@ -320,10 +311,51 @@ func UserQuery(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	result := QueryResult{}
 	err = runSingleQuerySync(db, queryReqFindUser, &result)
 	if err != nil {
-		json.NewEncoder(w).Encode(err.Error())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(result.Result)
+	err = json.NewEncoder(w).Encode(result.Result)
+	if err != nil {
+		log.Println("error writing UserQuery responses", err)
+	}
+}
+
+// handler for POST `/users`
+// Create a user, need to check duplications
+func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	b := make([]byte, 200)
+	n, err := r.Body.Read(b)
+	if err != nil && err != io.EOF {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	createUserCQ := "CREATE (u:USER " + formatToNeoJson(string(b[:n])) +
+		")" + "RETURN u.name as name, u.email as email, u.role as role," +
+		"u.hashedPassword as hashedPassword, u.salt as salt," +
+		"u.id as id"
+
+	queryReqCreateUser := QueryRequest{
+		Name:   "create-user",
+		Result: &[]User{},
+		Query: makeCypherQuery(
+			createUserCQ,
+			nil,
+			nil,
+		),
+	}
+
+	result := QueryResult{}
+	err = runSingleQuerySync(db, queryReqCreateUser, &result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(result.Result)
+	if err != nil {
+		log.Println("error writing UserCreate responses", err)
+	}
 }
 
 func init() {
@@ -336,9 +368,16 @@ func init() {
 
 func main() {
 	router := httprouter.New()
+
+	router.GET("/users", UserGetAll)
 	router.GET("/users/:id", UserGetOne)
 	router.POST("/users/query", UserQuery)
-	//	http.HandleFunc("/query/", httpQueryHandler)
-	//	http.HandleFunc("/users/", httpUserHandler)
+	router.POST("/users", UserCreate)
+
 	log.Fatal(http.ListenAndServe(":8888", router))
+}
+
+// Format {"name": "Jon Snow"} to {name: "Jon Snow"}
+func formatToNeoJson(jsonString string) string {
+	return regexp.MustCompile(`"([a-zA-Z0-9]+)":`).ReplaceAllString(jsonString, "${1}:")
 }
