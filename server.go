@@ -285,15 +285,15 @@ func UserGetOne(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 func UserQuery(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	log.Println("Request from " + r.Host + r.URL.Path)
 
-	// TODO: Maybe 200 is too much?
-	b := make([]byte, 100)
-	n, err := r.Body.Read(b)
-	if err != nil && err != io.EOF {
+	body, err := getReqBody(r)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	finUserCQ := "MATCH (u:USER " + formatToNeoJson(string(b[:n])) + ")" +
+	log.Println("query body: " + body)
+
+	finUserCQ := "MATCH (u:USER " + body + ")" +
 		"RETURN u.name as name, u.email as email, u.role as role," +
 		"u.hashedPassword as hashedPassword, u.salt as salt," +
 		"u.id as id"
@@ -323,15 +323,14 @@ func UserQuery(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 // handler for POST `/users`
 // Create a user, need to check duplications
 func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	b := make([]byte, 200)
-	n, err := r.Body.Read(b)
-	if err != nil && err != io.EOF {
+	body, err := getReqBody(r)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	createUserCQ := "CREATE (u:USER " + formatToNeoJson(string(b[:n])) +
-		")" + "RETURN u.name as name, u.email as email, u.role as role," +
+	createUserCQ := "CREATE (u:USER " + body + ")" +
+		"RETURN u.name as name, u.email as email, u.role as role," +
 		"u.hashedPassword as hashedPassword, u.salt as salt," +
 		"u.id as id"
 
@@ -358,6 +357,39 @@ func UserCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	}
 }
 
+// handler for PUT `/users/:id`
+func UserUpdate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	log.Println("Request from " + r.URL.Path)
+
+	var props map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&props)
+
+	log.Printf("query map: %v\n", props)
+
+	updateUserCQ := `
+		MATCH (u:USER {id: {id}}) SET u = {props} 
+		RETURN u.name as name, u.email as email, u.role as role,
+		u.hashedPassword as hashedPassword, u.salt as salt, u.id as id
+	`
+	queryReqUpdateUser := QueryRequest{
+		Name:   "update-user",
+		Result: &[]User{},
+		Query: makeCypherQuery(
+			updateUserCQ,
+			neoism.Props{"id": ps.ByName("id"), "props": props},
+			nil,
+		),
+	}
+
+	result := QueryResult{}
+	err = runSingleQuerySync(db, queryReqUpdateUser, &result)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	json.NewEncoder(w).Encode(result.Result)
+}
+
 func init() {
 	var err error
 	db, err = neoism.Connect(dbUrl)
@@ -373,6 +405,7 @@ func main() {
 	router.GET("/users/:id", UserGetOne)
 	router.POST("/users/query", UserQuery)
 	router.POST("/users", UserCreate)
+	router.PUT("/users/:id", UserUpdate)
 
 	log.Fatal(http.ListenAndServe(":8888", router))
 }
@@ -380,4 +413,14 @@ func main() {
 // Format {"name": "Jon Snow"} to {name: "Jon Snow"}
 func formatToNeoJson(jsonString string) string {
 	return regexp.MustCompile(`"([a-zA-Z0-9]+)":`).ReplaceAllString(jsonString, "${1}:")
+}
+
+// read the request body and format it
+func getReqBody(r *http.Request) (string, error) {
+	b := make([]byte, 200)
+	n, err := r.Body.Read(b)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	return formatToNeoJson(string(b[:n])), nil
 }
