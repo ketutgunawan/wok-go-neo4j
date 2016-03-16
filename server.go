@@ -366,8 +366,10 @@ func UserUpdate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 
 	log.Printf("query map: %v\n", props)
 
-	updateUserCQ := `
-		MATCH (u:USER {id: {id}}) SET u = {props} 
+	saveUserCQ := `
+		MERGE (u:USER {id: {id}})
+		ON CREATE SET u = {props}
+		ON MATCH SET u = {props}
 		RETURN u.name as name, u.email as email, u.role as role,
 		u.hashedPassword as hashedPassword, u.salt as salt, u.id as id
 	`
@@ -375,7 +377,7 @@ func UserUpdate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		Name:   "update-user",
 		Result: &[]User{},
 		Query: makeCypherQuery(
-			updateUserCQ,
+			saveUserCQ,
 			neoism.Props{"id": ps.ByName("id"), "props": props},
 			nil,
 		),
