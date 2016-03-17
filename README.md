@@ -25,7 +25,7 @@ An <strong>UNFINISHED</strong> server written in Go and backed with Neo4j
 
 
 
-# By support of:
+# Credit:
 
 * [Neoism](https://github.com/jmcvetta/neoism)
 * [HttpRouter](https://github.com/julienschmidt/httprouter)
