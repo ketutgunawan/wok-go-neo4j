@@ -92,6 +92,7 @@ type appHandlerFunc func(*app.AppContext, http.ResponseWriter, *http.Request, ht
 
 func makeHandler(context *app.AppContext, handle appHandlerFunc) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+		log.Println("Request from " + r.URL.Path)
 		if status, err := handle(context, w, r, ps); err != nil {
 			switch status {
 			case http.StatusNotFound:

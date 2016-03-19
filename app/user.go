@@ -1,3 +1,4 @@
+// user handlers
 package app
 
 import (
@@ -79,8 +80,6 @@ func UserGetAll(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 
 // handler for GET `/users/:id`
 func UserGetOne(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
-	log.Println("Request from " + r.Host + r.URL.Path)
-
 	queryReqFindUserById := QueryRequest{
 		Name:   "find-user-by-id",
 		Result: &[]User{},
@@ -99,8 +98,6 @@ func UserGetOne(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 
 // handler for POST `/users/query`
 func UserQuery(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
-	log.Println("Request from " + r.Host + r.URL.Path)
-
 	body, err := getReqBody(r)
 	if err != nil {
 		return http.StatusBadRequest, err
@@ -166,8 +163,6 @@ func UserCreate(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 
 // handler for PUT `/users/:id`
 func UserUpdate(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
-	log.Println("Request from " + r.URL.Path)
-
 	var props map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&props)
 
@@ -197,4 +192,10 @@ func UserUpdate(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 	}
 
 	return http.StatusOK, json.NewEncoder(w).Encode(result.Result)
+}
+
+// handler for POST /users/query/:queryName
+func UserComplexQuery(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
+	queryName := ps.ByName("queryName")
+	return http.StatusNotImplemented, json.NewEncoder(w).Encode("Not implemented yet")
 }
