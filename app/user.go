@@ -197,5 +197,6 @@ func UserUpdate(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 // handler for POST /users/query/:queryName
 func UserComplexQuery(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
 	queryName := ps.ByName("queryName")
+	log.Println(queryName)
 	return http.StatusNotImplemented, json.NewEncoder(w).Encode("Not implemented yet")
 }
