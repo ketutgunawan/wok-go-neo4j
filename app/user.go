@@ -14,7 +14,7 @@ var (
 		MATCH (u:USER)
 		RETURN u.name as name, u.email as email, u.role as role,
 				u.hashedPassword as hashedPassword, u.salt as salt,
-				u._id as _id
+				u.id as id
 	`
 	FIND_USER_BY_EMAIL = `
 		MATCH (u:USER)
@@ -194,9 +194,20 @@ func UserUpdate(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 	return http.StatusOK, json.NewEncoder(w).Encode(result.Result)
 }
 
+// TODO Not implemented yet!!
 // handler for POST /users/query/:queryName
 func UserComplexQuery(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
 	queryName := ps.ByName("queryName")
 	log.Println(queryName)
+	return http.StatusNotImplemented, json.NewEncoder(w).Encode("Not implemented yet")
+}
+
+// TODO Not implemented yet!!
+// handler for DELETE /users/:id
+// Note: This operation will delete the user node along with all relationships bind to it.
+func UserDestroy(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
+	//	deleteUser = "MATCH (u:USER)" +
+	//		"u.id=" + ps.ByName("id") +
+	//		"REMOVE u"
 	return http.StatusNotImplemented, json.NewEncoder(w).Encode("Not implemented yet")
 }

@@ -97,8 +97,8 @@ func makeHandler(context *app.AppContext, handle appHandlerFunc) httprouter.Hand
 			switch status {
 			case http.StatusNotFound:
 				http.NotFound(w, r)
-			case http.StatusBadRequest:
-				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				//	case http.StatusBadRequest:
+				//		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			case http.StatusInternalServerError:
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			default:
@@ -123,6 +123,9 @@ func main() {
 	router.POST("/users/query", makeHandler(context, app.UserQuery))
 	router.POST("/users", makeHandler(context, app.UserCreate))
 	router.PUT("/users/:id", makeHandler(context, app.UserUpdate))
+
+	router.GET("/posts", makeHandler(context, app.PostGetAll))
+	router.POST("/posts", makeHandler(context, app.PostCreate))
 
 	log.Fatal(http.ListenAndServe(":8888", router))
 }
