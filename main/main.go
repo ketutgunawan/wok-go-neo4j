@@ -125,6 +125,7 @@ func main() {
 	router.PUT("/users/:id", makeHandler(context, app.UserUpdate))
 
 	router.GET("/posts", makeHandler(context, app.PostGetAll))
+	router.POST("/posts/query", makeHandler(context, app.PostQuery))
 	router.POST("/posts", makeHandler(context, app.PostCreate))
 
 	log.Fatal(http.ListenAndServe(":8888", router))
