@@ -92,7 +92,7 @@ type appHandlerFunc func(*app.AppContext, http.ResponseWriter, *http.Request, ht
 
 func makeHandler(context *app.AppContext, handle appHandlerFunc) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-		log.Println("Request from " + r.URL.Path)
+		log.Println("Request: " + r.Method + " " + r.URL.Path)
 		if status, err := handle(context, w, r, ps); err != nil {
 			switch status {
 			case http.StatusNotFound:
@@ -118,15 +118,21 @@ func main() {
 
 	router := httprouter.New()
 
+	// user handlers
 	router.GET("/users", makeHandler(context, app.UserGetAll))
 	router.GET("/users/:id", makeHandler(context, app.UserGetOne))
 	router.POST("/users/query", makeHandler(context, app.UserQuery))
 	router.POST("/users", makeHandler(context, app.UserCreate))
 	router.PUT("/users/:id", makeHandler(context, app.UserUpdate))
+	router.DELETE("/users/:id", makeHandler(context, app.UserDestroy))
 
+	// post handlers
 	router.GET("/posts", makeHandler(context, app.PostGetAll))
+	router.GET("/posts/:id", makeHandler(context, app.PostGetOne))
 	router.POST("/posts/query", makeHandler(context, app.PostQuery))
 	router.POST("/posts", makeHandler(context, app.PostCreate))
+	router.PUT("/posts/:id", makeHandler(context, app.PostUpdate))
+	router.DELETE("/posts/:id", makeHandler(context, app.PostDestroy))
 
 	log.Fatal(http.ListenAndServe(":8888", router))
 }

@@ -80,18 +80,24 @@ func UserGetAll(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 
 // handler for GET `/users/:id`
 func UserGetOne(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
+	userFindById := `
+		MATCH (u:USER {id:{id}})
+		RETURN u.name as name, u.email as email, u.role as role,
+				u.hashedPassword as hashedPassword, u.salt as salt,
+				u.id as id
+	`
+
 	queryReqFindUserById := QueryRequest{
 		Name:   "find-user-by-id",
 		Result: &[]User{},
-		Query: MakeQuery(
-			FIND_USER_BY_ID,
-			Props{"id": ps.ByName("id")},
-			nil,
-		),
+		Query:  MakeQuery(userFindById, Props{"id": ps.ByName("id")}, nil),
 	}
 
 	result := QueryResult{}
-	context.DB.RunSingleQuery(queryReqFindUserById, &result)
+	err := context.DB.RunSingleQuery(queryReqFindUserById, &result)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
 
 	return http.StatusOK, json.NewEncoder(w).Encode(result.Result)
 }
@@ -162,6 +168,7 @@ func UserCreate(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 }
 
 // handler for PUT `/users/:id`
+// This will update the user or create one if not exists
 func UserUpdate(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
 	var props map[string]interface{}
 	err := json.NewDecoder(r.Body).Decode(&props)
@@ -188,7 +195,7 @@ func UserUpdate(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 	result := QueryResult{}
 	err = context.DB.RunSingleQuery(queryReqUpdateUser, &result)
 	if err != nil {
-		return http.StatusBadRequest, err
+		return http.StatusInternalServerError, err
 	}
 
 	return http.StatusOK, json.NewEncoder(w).Encode(result.Result)
@@ -202,12 +209,25 @@ func UserComplexQuery(context *AppContext, w http.ResponseWriter, r *http.Reques
 	return http.StatusNotImplemented, json.NewEncoder(w).Encode("Not implemented yet")
 }
 
-// TODO Not implemented yet!!
+// TODO Maybe soft-delete is better?
 // handler for DELETE /users/:id
-// Note: This operation will delete the user node along with all relationships bind to it.
+// Note: This operation will delete the user node along with all relationships going to or from it.
 func UserDestroy(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
-	//	deleteUser = "MATCH (u:USER)" +
-	//		"u.id=" + ps.ByName("id") +
-	//		"REMOVE u"
-	return http.StatusNotImplemented, json.NewEncoder(w).Encode("Not implemented yet")
+	userDestroy := `
+		MATCH (u:USER {id:{id}})
+		DETACH DELETE u
+	`
+	queryReqUserDestroy := QueryRequest{
+		Name:   "delelte-user",
+		Result: nil,
+		Query:  MakeQuery(userDestroy, Props{"id": ps.ByName("id")}, nil),
+	}
+
+	result := QueryResult{}
+	err := context.DB.RunSingleQuery(queryReqUserDestroy, &result)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	return http.StatusOK, json.NewEncoder(w).Encode("Delete user ok.")
 }
