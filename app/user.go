@@ -142,12 +142,14 @@ func UserCreate(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 	if err != nil {
 		return http.StatusBadRequest, err
 	}
+	log.Println(body)
 
 	createUserCQ := "CREATE (u:USER " + body + ")" +
 		"RETURN u.name as name, u.email as email, u.role as role," +
 		"u.hashedPassword as hashedPassword, u.salt as salt," +
 		"u.id as id"
 
+	log.Println(createUserCQ)
 	queryReqCreateUser := QueryRequest{
 		Name:   "create-user",
 		Result: &[]User{},

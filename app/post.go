@@ -99,6 +99,7 @@ func PostQuery(context *AppContext, w http.ResponseWriter, r *http.Request, ps h
 		p.viewCount as viewCount, r.createTime as createTime,
 		p.lastModifiedTime as lastModifiedTime, author
 	`
+	log.Println(postFind)
 
 	queryReqFindPost := QueryRequest{
 		Name:   "find-post",
@@ -129,6 +130,7 @@ func PostCreate(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 	postCreate := `
 		MATCH (author:USER {id:{uid}})
 		CREATE (author)-[r:CREATED {createTime: timestamp()}]->(p:POST {props})
+		SET p.publishDate = r.createTime
 		RETURN p.id as id, p.title as title, p.type as type,
 		p.body as body, p.status as status, p.publishDate as publishDate,
 		p.upvotes as upvotes, p.downvotes as downvotes,

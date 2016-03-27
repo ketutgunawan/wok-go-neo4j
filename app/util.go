@@ -15,7 +15,7 @@ func formatToNeoJson(jsonString string) string {
 
 // read the request body and format it
 func getReqBody(r *http.Request) (string, error) {
-	b := make([]byte, 200)
+	b := make([]byte, 300)
 	n, err := r.Body.Read(b)
 	if err != nil && err != io.EOF {
 		return "", err
