@@ -21,7 +21,8 @@ An <strong>UNFINISHED</strong> server written in Go and backed with Neo4j
 
 #### Relation
 * GET  /relation/:id1/:id2 -- Get relation(with properties) between nodes by their ids 
-* POST /relation/query/:queryName -- Custom query(with query parameters)
+* POST /relation/:relationType/:id1/:id2 -- Create relation between nodes by their ids
+* POST /relation/query/:queryName -- Complex query(with query parameters)
 
 
 

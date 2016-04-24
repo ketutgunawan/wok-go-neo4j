@@ -85,6 +85,8 @@ func PostGetOne(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 
 // handler for POST /posts/query
 func PostQuery(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
+	// able to get query string later
+	r.ParseForm()
 	body, err := getReqBody(r)
 	if err != nil {
 		return http.StatusBadRequest, err
@@ -99,6 +101,18 @@ func PostQuery(context *AppContext, w http.ResponseWriter, r *http.Request, ps h
 		p.viewCount as viewCount, r.createTime as createTime,
 		p.lastModifiedTime as lastModifiedTime, author
 	`
+	if order := r.Form.Get("orderBy"); order != "" {
+		postFind += "\nORDER BY p." + order
+		if desc := r.Form.Get("desc"); desc == "true" {
+			postFind += " DESC"
+		}
+	}
+	if skip := r.Form.Get("skip"); skip != "" {
+		postFind += "\nSKIP " + skip
+	}
+	if limit := r.Form.Get("limit"); limit != "" {
+		postFind += "\nLIMIT " + limit
+	}
 	log.Println(postFind)
 
 	queryReqFindPost := QueryRequest{

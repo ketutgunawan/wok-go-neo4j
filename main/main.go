@@ -101,6 +101,7 @@ func makeHandler(context *app.AppContext, handle appHandlerFunc) httprouter.Hand
 				//		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 			case http.StatusInternalServerError:
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				log.Println(err.Error())
 			default:
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
