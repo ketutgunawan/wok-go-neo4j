@@ -126,6 +126,7 @@ func main() {
 	router.POST("/users", makeHandler(context, app.UserCreate))
 	router.PUT("/users/:id", makeHandler(context, app.UserUpdate))
 	router.DELETE("/users/:id", makeHandler(context, app.UserDestroy))
+	router.GET("/users/:id/votes", makeHandler(context, app.UserGetVotedPosts))
 
 	// post handlers
 	router.GET("/posts", makeHandler(context, app.PostGetAll))
@@ -134,6 +135,9 @@ func main() {
 	router.POST("/posts", makeHandler(context, app.PostCreate))
 	router.PUT("/posts/:id", makeHandler(context, app.PostUpdate))
 	router.DELETE("/posts/:id", makeHandler(context, app.PostDestroy))
+	router.PUT("/posts/:id/vote", makeHandler(context, app.PostVote))
+	router.DELETE("/posts/:id/vote", makeHandler(context, app.PostDeleteVote))
+	router.GET("/posts/:id/vote", makeHandler(context, app.PostGetVote))
 
 	log.Fatal(http.ListenAndServe(":8888", router))
 }

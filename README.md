@@ -10,14 +10,18 @@ An <strong>UNFINISHED</strong> server written in Go and backed with Neo4j
 * POST /users/query -- Get users by mutiple properties (with prop values)
 * POST /users/query/:queryName -- Complex query (with query parameters)
 * PUT  /users/:id -- Update a user by id (with user data)
+* GET  /users/:id/votes -- Get posts voted by user by id
 
 #### POST
-* GET  /posts -- Get all posts
-* GET  /posts/:id -- Get a post by id
-* POST /posts -- Create a post (with post data)
-* POST /posts/query -- Get posts by mutiple properties (with prop values)
-* POST /posts/query/:queryName -- Complex query (with query parameters)
-* PUT  /posts/:id -- Update a post by id (with post data)
+* GET    /posts -- Get all posts
+* GET    /posts/:id -- Get a post by id
+* POST   /posts -- Create a post (with post data)
+* POST   /posts/query -- Get posts by mutiple properties (with prop values)
+* POST   /posts/query/:queryName -- Complex query (with query parameters)
+* PUT    /posts/:id -- Update a post by id (with post data)
+* PUT    /posts/:id/vote -- Vote a post
+* DELETE /posts/:id/vote -- Devote a post
+* GET    /posts/:id/vote -- Get a post's votes
 
 #### Relation
 * GET  /relation/:id1/:id2 -- Get relation(with properties) between nodes by their ids 

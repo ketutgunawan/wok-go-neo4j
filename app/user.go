@@ -233,3 +233,26 @@ func UserDestroy(context *AppContext, w http.ResponseWriter, r *http.Request, ps
 
 	return http.StatusOK, json.NewEncoder(w).Encode("Delete user ok.")
 }
+
+func UserGetVotedPosts(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
+	userGetVotedPosts := `
+		MATCH (u:USER {id: {id}})-[:VOTED]->(p:POST)
+		RETURN p.id as id
+	`
+
+	queryReqUserGetVotedPosts := QueryRequest{
+		Name: "user-get-voted-posts",
+		Result: &[]struct {
+			Id string `json:"id"`
+		}{},
+		Query: MakeQuery(userGetVotedPosts, Props{"id": ps.ByName("id")}, nil),
+	}
+
+	result := QueryResult{}
+	err := context.DB.RunSingleQuery(queryReqUserGetVotedPosts, &result)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	return http.StatusOK, json.NewEncoder(w).Encode(result.Result)
+}

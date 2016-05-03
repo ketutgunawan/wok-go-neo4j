@@ -24,6 +24,11 @@ type Post struct {
 	LastModifiedTime int                    `json:"lastModifiedTime"`
 }
 
+type VoteRel struct {
+	Created int  `json:"created"`
+	Found   bool `json:"found"`
+}
+
 // handler for GET /posts
 func PostGetAll(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
 	postGetAll := `
@@ -51,7 +56,12 @@ func PostGetAll(context *AppContext, w http.ResponseWriter, r *http.Request, ps 
 		return http.StatusInternalServerError, err
 	}
 	log.Println(result.Result)
-	return http.StatusOK, json.NewEncoder(w).Encode(result.Result)
+	var res interface{}
+	res, err = getAuthorData(result.Result)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	return http.StatusOK, json.NewEncoder(w).Encode(res)
 }
 
 // handler for GET /posts/:id
@@ -238,4 +248,91 @@ func PostDestroy(context *AppContext, w http.ResponseWriter, r *http.Request, ps
 	}
 
 	return http.StatusOK, json.NewEncoder(w).Encode("Delete post ok.")
+}
+
+// vote a post
+func PostVote(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
+	var props map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&props)
+	if err != nil {
+		log.Println("Parse request body error.")
+	}
+
+	postVote := `
+		MATCH (u:USER {id: {props}.id}), (p:POST {id: {id}})
+		MERGE (u)-[r:VOTED]->(p)
+		ON CREATE SET r.created=timestamp(), r.found=false, p.upvotes=p.upvotes+1
+		ON MATCH SET r.found=true
+		RETURN r.created as craeted, r.found as found
+	`
+
+	queryReqPostVote := QueryRequest{
+		Name:   "vote-post",
+		Result: &[]VoteRel{},
+		Query: MakeQuery(
+			postVote,
+			Props{"id": ps.ByName("id"), "props": props},
+			nil,
+		),
+	}
+	result := QueryResult{}
+	err = context.DB.RunSingleQuery(queryReqPostVote, &result)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	return http.StatusNoContent, json.NewEncoder(w).Encode("Vote post ok.")
+}
+
+// devote a post
+func PostDeleteVote(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
+	var props map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&props)
+	if err != nil {
+		log.Println("Parse request body error.")
+	}
+
+	postDeleteVote := `
+		MATCH (u:USER {id: {props}.id})-[r:VOTED]->(p:POST {id: {id}})
+		SET p.upvotes=p.upvotes-1
+		DELETE r
+	`
+
+	queryReqPostDeleteVote := QueryRequest{
+		Name:   "delete-post-vote",
+		Result: nil,
+		Query:  MakeQuery(postDeleteVote, Props{"id": ps.ByName("id"), "props": props}, nil),
+	}
+
+	result := QueryResult{}
+	err = context.DB.RunSingleQuery(queryReqPostDeleteVote, &result)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	return http.StatusOK, json.NewEncoder(w).Encode("Delete post vote ok.")
+}
+
+// get a post's vote count
+func PostGetVote(context *AppContext, w http.ResponseWriter, r *http.Request, ps httprouter.Params) (int, error) {
+	postGetVote := `
+		MATCH (p:POST {id: {id}})
+		RETURN p.upvotes as votes
+	`
+
+	queryReqPostGetVote := QueryRequest{
+		Name: "get-post-vote",
+		Result: &[]struct {
+			Votes int `json:"votes"`
+		}{},
+		Query: MakeQuery(postGetVote, Props{"id": ps.ByName("id")}, nil),
+	}
+
+	result := QueryResult{}
+	err := context.DB.RunSingleQuery(queryReqPostGetVote, &result)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	return http.StatusOK, json.NewEncoder(w).Encode(result.Result)
 }
